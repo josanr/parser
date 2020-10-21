@@ -20,10 +20,11 @@ class FinoUgorskaiaParser implements ParserInterface
     const USER_ID = 2;
     const FEED_ID = 2;
 
-    const ROOT_SRC = "http://fugazeta.ru/feed/";
+    const ROOT_SRC = "http://fugazeta.ru";
 
     const FEED_SRC = "/feed/";
     const LIMIT = 100;
+    const EMPTY_DESCRIPTION = "empty";
 
 
     /**
@@ -39,10 +40,17 @@ class FinoUgorskaiaParser implements ParserInterface
 
         $listSourceData = $curl->get($listSourcePath);
 
-        $crawler = new Crawler($listSourceData);
+        if (empty($listSourceData)) {
+            throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+        }
 
+        $crawler = new Crawler($listSourceData);
+        $items = $crawler->filter("item");
+        if ($items->count() === 0) {
+            throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+        }
         $counter = 0;
-        foreach ($crawler->filter("item") as $item) {
+        foreach ($items as $item) {
             try {
                 $node = new Crawler($item);
                 $newsPost = self::inflatePost($node);
@@ -89,13 +97,7 @@ class FinoUgorskaiaParser implements ParserInterface
         $imageUrl = null;
 
 
-        $description = $postData->filter("description")->text();
-        if (empty($description)) {
-            $text = $postData->filterXPath("item/yandex:full-text");
-
-            $sentences = preg_split('/(?<=[.?!])\s+(?=[а-я])/i', $text->text());
-            $description = implode(" ", array_slice($sentences, 0, 3));
-        }
+        $description = self::EMPTY_DESCRIPTION;
 
         return new NewsPost(
             self::class,
@@ -117,49 +119,134 @@ class FinoUgorskaiaParser implements ParserInterface
     private static function inflatePostContent(NewsPost $post, Curl $curl)
     {
         $url = $post->original;
+        $post->description = "";
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
 
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("article.post");
 
-        $header = $content->filter("div.post_header h2");
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 2);
-        }
-
 
         $image = $content->filter("div.entry-content img");
 
         if ($image->count() !== 0) {
-            self::addImage($post, self::ROOT_SRC . $image->attr("src"));
+            $post->image = self::normalizeUrl($image->attr("src"));
         }
 
-        $body = $content->filter("div.entry-content")->getNode(0);
+        $body = $content->filter("div.entry-content ");
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
+
 
         /** @var DOMNode $bodyNode */
-        foreach ($body->childNodes as $bodyNode) {
+        foreach ($body->getNode(0)->childNodes as $bodyNode) {
             $node = new Crawler($bodyNode);
 
-            if ($bodyNode->nodeName === "#text" && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+            if ($node->matches("div.img-detail") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                $post->description = Helper::prepareString($node->text());
                 continue;
             }
-            if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
+
+            if ($node->matches("div.news-detail, div.content") && !empty(trim($node->text(), "\xC2\xA0"))) {
+
+                $node->children("p")->each(function (Crawler $pNode) use ($post) {
+
+                    if ($pNode->filter("iframe")->count() !== 0) {
+                        $videoContainer = $pNode->filter("iframe");
+                        if ($videoContainer->count() !== 0) {
+                            self::addVideo($post, $videoContainer->attr("src"));
+                        }
+                    }
+
+
+                    if (!empty(trim($pNode->text(), "\xC2\xA0"))) {
+                        if ($post->description === "") {
+                            $post->description = Helper::prepareString($pNode->text());
+                        } else {
+                            self::addText($post, $pNode->text());
+                        }
+                    }
+                });
+
+                $node->children("div")->each(function (Crawler $pNode) use ($post) {
+                    if (!empty(trim($pNode->text(), "\xC2\xA0"))) {
+                        if ($post->description === "") {
+                            $post->description = Helper::prepareString($pNode->text());
+                        } else {
+                            self::addText($post, $pNode->text());
+                        }
+                    }
+                });
+                continue;
+            }
+
+
+            if ($node->matches("div.enlarge") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 self::addText($post, $node->text());
                 continue;
             }
 
-            if ($node->matches("div") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
+
+            if ($node->matches("p") && $node->filter("iframe")->count() !== 0) {
+                $videoContainer = $node->filter("iframe");
+                if ($videoContainer->count() !== 0) {
+                    self::addVideo($post, $videoContainer->attr("src"));
+                }
+            }
+
+
+
+            if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                if ($post->description === "") {
+                    $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
+                }
+                continue;
+            }
+
+            if ($bodyNode->nodeName === "#text" && !empty(trim($node->text(), "\xC2\xA0"))) {
+                if ($post->description === "") {
+                    $post->description = Helper::prepareString($node->text());
+                } else {
+                    self::addText($post, $node->text());
+                }
                 continue;
             }
         }
+    }
 
+
+    private static function addVideo(NewsPost $post, string $url)
+    {
+
+        $host = parse_url($url, PHP_URL_HOST);
+        if (mb_stripos($host, "youtu") === false) {
+            return;
+        }
+
+        $parsedUrl = explode("/", parse_url($url, PHP_URL_PATH));
+
+
+        if (!isset($parsedUrl[2])) {
+            throw new Exception("Could not parse Youtube ID");
+        }
+
+        $id = $parsedUrl[2];
+        $post->addItem(
+            new NewsPostItem(
+                NewsPostItem::TYPE_VIDEO,
+                null,
+                null,
+                null,
+                null,
+                $id
+            ));
     }
 
     /**
