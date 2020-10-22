@@ -40,10 +40,15 @@ class MagnitcaSportParser implements ParserInterface
 
             $listSourcePath = $listSourcePath = self::ROOT_SRC . self::FEED_SRC . "?start=" . $pageId;
             $listSourceData = $curl->get("$listSourcePath");
+            if (empty($listSourceData)) {
+                throw new Exception("Получен пустой ответ от источника списка новостей: " . $listSourcePath);
+            }
 
             $crawler = new Crawler($listSourceData);
             $content = $crawler->filter("article");
-
+            if ($content->count() === 0) {
+                throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+            }
             foreach ($content as $newsItem) {
                 try {
                     $node = new Crawler($newsItem);
@@ -113,25 +118,23 @@ class MagnitcaSportParser implements ParserInterface
         $url = $post->original;
 
         $pageData = $curl->get($url);
-        if ($pageData === false) {
-            throw new Exception("Url is wrong? nothing received: " . $url);
+        if (empty($pageData)) {
+            throw new Exception("Получен пустой ответ от страницы новости: " . $url);
         }
         $crawler = new Crawler($pageData);
 
         $content = $crawler->filter("article");
 
-        $header = $content->filter("h1");
-
-        if ($header->count() !== 0) {
-            self::addHeader($post, $header->text(), 1);
-        }
-
         $body = $content->filter("div.full_news");
         if ($body->count() === 0) {
             $body = $content->filter('[itemprop="articleBody"]');
         }
+        if ($body->count() === 0) {
+            throw new Exception("Не найден блок новости в полученой странице: " . $url);
+        }
 
         $bodyNodes = $body->filter("div, h2, h3, p");
+
         foreach ($bodyNodes as $bodyNode) {
             $node = new Crawler($bodyNode);
 
@@ -152,8 +155,11 @@ class MagnitcaSportParser implements ParserInterface
                     self::addText($post, $node->text());
                     continue;
                 }
-                if ($node->children()->count() === 0) {
-                    self::addText($post, $node->text());
+                if ($node->matches("p")) {
+                    $cleanText = str_ireplace($post->description, "", $node->text());
+                    if (!empty($cleanText)) {
+                        self::addText($post, $cleanText);
+                    }
                     continue;
                 }
             }
