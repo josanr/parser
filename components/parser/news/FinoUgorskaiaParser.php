@@ -151,8 +151,18 @@ class FinoUgorskaiaParser implements ParserInterface
                 $post->description = Helper::prepareString($node->text());
                 continue;
             }
+            if ($node->matches("div.enlarge") && !empty(trim($node->text(), "\xC2\xA0"))) {
+                self::addText($post, $node->text());
+                continue;
+            }
+            if ($node->matches("p") && $node->filter("iframe")->count() !== 0) {
+                $videoContainer = $node->filter("iframe");
+                if ($videoContainer->count() !== 0) {
+                    self::addVideo($post, $videoContainer->attr("src"));
+                }
+            }
 
-            if ($node->matches("div.news-detail, div.content") && !empty(trim($node->text(), "\xC2\xA0"))) {
+            if ($node->matches("div, article") && !empty(trim($node->text(), "\xC2\xA0"))) {
 
                 $node->children("p")->each(function (Crawler $pNode) use ($post) {
 
@@ -185,22 +195,6 @@ class FinoUgorskaiaParser implements ParserInterface
                 continue;
             }
 
-
-            if ($node->matches("div.enlarge") && !empty(trim($node->text(), "\xC2\xA0"))) {
-                self::addText($post, $node->text());
-                continue;
-            }
-
-
-            if ($node->matches("p") && $node->filter("iframe")->count() !== 0) {
-                $videoContainer = $node->filter("iframe");
-                if ($videoContainer->count() !== 0) {
-                    self::addVideo($post, $videoContainer->attr("src"));
-                }
-            }
-
-
-
             if ($node->matches("p") && !empty(trim($node->text(), "\xC2\xA0"))) {
                 if ($post->description === "") {
                     $post->description = Helper::prepareString($node->text());
@@ -218,6 +212,11 @@ class FinoUgorskaiaParser implements ParserInterface
                 }
                 continue;
             }
+        }
+
+
+        if(empty($post->description)){
+            throw new Exception("No text parsed: " . $url);
         }
     }
 
