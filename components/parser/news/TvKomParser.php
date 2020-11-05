@@ -49,7 +49,8 @@ class TvKomParser implements ParserInterface
             $crawler = new Crawler($listSourceData);
             $items = $crawler->filter("div.image-news-item");
             if ($items->count() === 0) {
-                throw new Exception("Пустой список новостей в ленте: " . $listSourcePath);
+                error_log("Пустой список новостей в ленте: " . $listSourcePath);
+                continue;
             }
             foreach ($items as $newsItem) {
                 try {
