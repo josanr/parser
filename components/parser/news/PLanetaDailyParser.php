@@ -148,7 +148,10 @@ class PLanetaDailyParser implements ParserInterface
             $node = new Crawler($bodyNode);
             if ($node->matches("p") && $node->filter("img")->count() !== 0) {
                 $image = $node->filter("img");
-                $src = self::normalizeUrl(self::ROOT_SRC . $image->attr("src"));
+                if(mb_stripos($image->attr("src"), "data:") === 0){
+                    continue;
+                }
+                $src = self::normalizeUrl($image->attr("src"));
                 if($post->image === null){
                     $post->image = $src;
                 }else{
@@ -233,6 +236,11 @@ class PLanetaDailyParser implements ParserInterface
      */
     protected static function normalizeUrl(string $content)
     {
+        if(mb_stripos($content, "//") === 0){
+            $content = "https:" . $content;
+        }else if($content[0] === "/"){
+            $content = self::ROOT_SRC . $content;
+        }
         return preg_replace_callback('/[^\x21-\x7f]/', function ($match) {
             return rawurlencode($match[0]);
         }, $content);
