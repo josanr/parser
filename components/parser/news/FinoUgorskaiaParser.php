@@ -138,6 +138,9 @@ class FinoUgorskaiaParser implements ParserInterface
         }
 
         $body = $content->filter("div.entry-content ");
+        if($body->filter("article div.field__item.even")->count() !== 0){
+            $body = $body->filter("article div.field__item.even");
+        }
         if ($body->count() === 0) {
             throw new Exception("Не найден блок новости в полученой странице: " . $url);
         }
@@ -161,7 +164,24 @@ class FinoUgorskaiaParser implements ParserInterface
                     self::addVideo($post, $videoContainer->attr("src"));
                 }
             }
+            if (
+                $node->matches("p")
+                    && $node->children("span.preview_text")->count() === 1
+                && !empty(trim($node->text(), "\xC2\xA0"))
+            ) {
+                /** @var DOMNode $pspanNode */
+                foreach($node->children("span.preview_text")->getNode(0)->childNodes as $pspanNode){
+                    if ($pspanNode->nodeName === "#text" && !empty(trim($pspanNode->textContent, " \xC2\xA0"))) {
+                        if ($post->description === "") {
+                            $post->description = Helper::prepareString(trim($pspanNode->textContent, " \xC2\xA0"));
+                        } else {
+                            self::addText($post, trim($pspanNode->textContent, " \xC2\xA0"));
+                        }
+                    }
+                }
 
+                continue;
+            }
             if ($node->matches("div, article") && !empty(trim($node->text(), "\xC2\xA0"))) {
 
                 $node->children("p")->each(function (Crawler $pNode) use ($post) {
