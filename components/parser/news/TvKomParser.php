@@ -177,6 +177,13 @@ class TvKomParser implements ParserInterface
         foreach ($body->children() as $bodyNode) {
             $node = new Crawler($bodyNode);
 
+            if(
+                mb_stripos(trim($node->text()), "Скачивайте приложение ") === 0
+                || mb_stripos(trim($node->text()), "Ещё больше новостей в нашем официальном канале Telegram!") === 0
+            ){
+                continue;
+            }
+
             if ($bodyNode->nodeName === "#text" && !empty(trim($bodyNode->nodeValue, " \n\r\xC2\xA0"))) {
                 if (empty($post->description)) {
                     $post->description = Helper::prepareString(trim($bodyNode->nodeValue));
