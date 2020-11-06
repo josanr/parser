@@ -23,6 +23,7 @@ class KuzbassfmRuParser implements ParserInterface
 
     public static function run(): array
     {
+        /*run*/
         $curl = Helper::getCurl();
         $xml  = $curl->get(self::SITE_URL.'rss/news.xml');
 

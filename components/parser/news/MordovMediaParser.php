@@ -16,6 +16,7 @@ use yii\base\Exception;
  */
 class MordovMediaParser implements ParserInterface
 {
+    /*run*/
 
     const USER_ID = 2;
     const FEED_ID = 2;

@@ -11,10 +11,14 @@
     "cagartner/phpquery": "^0.9.12",
     "lanfix/parser": "*",
     "symfony/dom-crawler": "^5.1",
-    "rowbot/punycode": "^1.0",
     "ext-dom": "*",
+    "ext-mbstring": "*",
+    "league/uri": "^6.3",
+    "rowbot/punycode": "^1.0",
     "symfony/css-selector": "^5.1",
-    "ext-mbstring": "*"
+    "ext-zlib": "*",
+    "ext-json": "*",
+    "fingli/parser-core": "dev-main"
   },
   "config": {
     "process-timeout": 1800,

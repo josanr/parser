@@ -12,6 +12,7 @@ use Symfony\Component\DomCrawler\Crawler;
 
 class RevdaInfoRuParser implements ParserInterface
 {
+    /*run*/
     const USER_ID = 2;
     const FEED_ID = 2;
 

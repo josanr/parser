@@ -16,6 +16,7 @@ use yii\base\Exception;
  */
 class VyatkaGradParser implements ParserInterface
 {
+    /*run*/
 
     const USER_ID = 2;
     const FEED_ID = 2;

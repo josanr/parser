@@ -17,6 +17,7 @@ use yii\base\Exception;
  */
 class News1743Parser implements ParserInterface
 {
+    /*run*/
 
     const USER_ID = 2;
     const FEED_ID = 2;

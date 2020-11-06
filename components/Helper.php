@@ -4,6 +4,8 @@ namespace app\components;
 
 use app\components\parser\NewsPost;
 use app\components\parser\NewsPostItem;
+use InvalidArgumentException;
+use League\Uri\Uri;
 use linslin\yii2\curl\Curl;
 
 class Helper
@@ -36,6 +38,36 @@ class Helper
     }
 
     /**
+     * Encode international unicode URL
+     * @param $url
+     * @return string
+     */
+    public static function encodeUrl(string $url): string
+    {
+        $uriParts = parse_url($url);
+        if ($uriParts === false) {
+            throw new InvalidArgumentException('Невалидный или сильно искаженный URL: ' . $url);
+        }
+
+        if (!empty($uriParts['path'])) {
+            $uriParts['path'] = implode('/', array_map('rawurlencode', explode('/', $uriParts['path'])));
+        }
+
+        return (string)Uri::createFromComponents($uriParts);
+    }
+
+    /**
+     * Encode url with scheme
+     * @param $url
+     * @return string
+     */
+    public static function encodeUrlIts($url):string
+    {
+        $pos = strrpos($url, '/') + 1;
+        return substr($url, 0, $pos) . urlencode(substr($url, $pos));
+    }
+
+    /**
      * Get curl object
      * @return Curl
      */
@@ -53,7 +85,7 @@ class Helper
             echo PHP_EOL . "---------------------" . PHP_EOL;
             echo 'title: ' . $post->title . PHP_EOL;
             echo 'description: ' . $post->description . PHP_EOL;
-            echo $post->image . PHP_EOL;
+            echo urldecode($post->image) . PHP_EOL;
             echo $post->original . PHP_EOL;
             echo $post->createDate->format('Y-m-d H:i:s') . PHP_EOL;
             /** @var NewsPostItem $item */
@@ -70,7 +102,7 @@ class Helper
                 if ($item->type == NewsPostItem::TYPE_LINK)
                     echo "\t $item->link" . PHP_EOL;
                 if ($item->type == NewsPostItem::TYPE_IMAGE)
-                    echo "\t $item->image" . PHP_EOL;
+                    echo "\t" . urldecode($item->image) . PHP_EOL;
                 if ($item->type == NewsPostItem::TYPE_VIDEO)
                     echo "\t $item->youtubeId" . PHP_EOL;
             }
@@ -78,4 +110,3 @@ class Helper
     }
 
 }
-
